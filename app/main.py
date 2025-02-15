@@ -42,7 +42,7 @@ AI_PROXY_CHAT_URL = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completio
 AI_PROXY_EMBEDDING_URL = "https://aiproxy.sanand.workers.dev/openai/v1/embeddings"
 AIPROXY_TOKEN = os.getenv("AIPROXY_TOKEN")
 
-# Security settings
+# Security setting
 SECURE_DATA_PATH = "/data/"
 
 # Initialize logging
