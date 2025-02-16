@@ -71,7 +71,7 @@ def enforce_data_security(file_path):
     if not file_path.startswith(SECURE_DATA_PATH):
         raise PermissionError(f"Access denied: {file_path}")
 
-def prevent_deletion(file_path):
+def file_folder_deletion(file_path):
     logger.info(f"Checking file path: {file_path}")
     raise PermissionError(f"Deletion not allowed: {file_path}")
 
@@ -181,7 +181,7 @@ def ask_llm(task_description):
             "parameters": {
                 "type": "object",
                 "properties": {"repo_url": {"type": "string"}, "branch": {"type": "string"}, "commit_message": {"type": "string"}},
-                "required": ["repo_url", "branch", "commit_message"]
+                "required": ["repo_url"]
             }
         },
         {
@@ -293,6 +293,15 @@ def ask_llm(task_description):
                 },
                 "required": ["file", "filter_column", "filter_value", "output_file"]
             }
+        },
+        {
+            "name": "file_folder_deletion",
+            "description": "Delete a file or folder",
+            "parameters": {
+                "type": "object",
+                "properties": {"file_path": {"type": "string"}},
+                "required": ["file_path"]
+            }
         }  
     ]
 
@@ -365,13 +374,15 @@ def read_file(path):
         with open(path, "r") as file:
             return file.read()
     except FileNotFoundError:
-        return None
+        return f"File {path} not found."
+    return f"File {path} read successfully."
 
 def write_file(path, content):
     enforce_data_security(path)
     logger.info(f"Writing to file {path}")
     with open(path, "w") as file:
         file.write(content)
+    return f"File {path} written successfully."
 
 def install_uv_and_run_script(script_url, user_email):
     """Installs `uv` (if required), downloads `datagen.py`, and runs it with `user.email`."""
@@ -431,19 +442,22 @@ def install_uv_and_run_script(script_url, user_email):
 def install_package(package):
     logger.info(f"Installing package {package}")
     subprocess.run(["pip", "install", package], check=True)
+    return f"Package {package} installed successfully."
 
 def execute_linux_command(command):
     logger.info(f"Executing linux command {command}")
     subprocess.run([command], check=True)
+    return f"Command {command} executed successfully."
 
 def execute_script(script, args=[]):
     enforce_data_security(script)
     logger.info(f"Executing script {script} with args {args}")
     subprocess.run(["python3", script] + args, check=True)
+    return f"Script {script} executed successfully."
 
 def clean_date_string(date_str):
     """Cleans the date string by removing extra spaces, special characters, and time if present."""
-    logger.info(f"Cleaning date string: {date_str}")
+    # logger.info(f"Cleaning date string: {date_str}")
     date_str = date_str.strip()  # Remove leading/trailing spaces
     date_str = re.sub(r"[^\w\s/-]", "", date_str)  # Remove special characters except / and -
     date_str = re.split(r"\s+", date_str)[0]  # Remove time component if present
@@ -514,6 +528,7 @@ def extract_email(file, output_file):
     if match:
         with open(output_file, "w") as f:
             f.write(match.group(1))
+        return f"Email extracted and saved to {output_file}."
 
 def preprocess_image(file):
     """Preprocess the image to improve OCR accuracy."""
@@ -564,6 +579,8 @@ def get_recent_log_lines(directory, output_file):
             with open(log, "r") as lf:
                 f.write(lf.readline().strip() + "\n")
 
+    return f"Last 10 log lines written to {output_file}"
+
 def sort_json(file, output_file=None, keys=None):
     """Sorts contacts from a JSON file in ascending order by last_name, then first_name, and writes only JSON output."""
     enforce_data_security(file)
@@ -597,7 +614,7 @@ def sort_json(file, output_file=None, keys=None):
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(sorted_contacts, f, separators=(",", ":"))
 
-        return None  # No extra return message, just pure JSON output in the file
+        return f"Sorted contacts written to {output_file}."  # No extra return message, just pure JSON output in the file
     except Exception as e:
         return f"Error processing JSON file: {str(e)}"
 
@@ -651,8 +668,9 @@ def fetch_api_data(url, output_file):
     logger.info(f"Fetching API data from {url} and writing to {output_file}")
     response = requests.get(url)
     write_file(output_file, response.text)
+    return f"API data written to {output_file}"
 
-def clone_git_repo(repo_url, branch, commit_message):
+def clone_git_repo(repo_url, branch="main", commit_message="Dummy commit"):
     logger.info(f"Cloning git repo {repo_url} with branch {branch} and commit message {commit_message}")
     repo_name = repo_url.split("/")[-1].replace(".git", "")
     git.Repo.clone_from(repo_url, repo_name)
@@ -663,6 +681,7 @@ def clone_git_repo(repo_url, branch, commit_message):
     repo.git.add(A=True)
     repo.git.commit("-m", commit_message)
     repo.git.push()
+    return f"Cloned repo {repo_url} with branch {branch} and committed {commit_message} and pushed"
 
 def scrape_website(url, output_file):
     enforce_data_security(output_file)
@@ -670,6 +689,7 @@ def scrape_website(url, output_file):
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
     write_file(output_file, soup.prettify())
+    return f"Scraped content written to {output_file}"
 
 def transcribe_audio(input_file, output_file):
     enforce_data_security(output_file)
@@ -680,6 +700,7 @@ def transcribe_audio(input_file, output_file):
         audio = recognizer.record(source)
     text = recognizer.recognize_google(audio)
     write_file(output_file, text)
+    return f"Transcribed audio written to {output_file}"
 
 def convert_markdown_to_html(input_file, output_file):
     enforce_data_security(output_file)
@@ -688,6 +709,7 @@ def convert_markdown_to_html(input_file, output_file):
     with open(input_file, "r") as f:
         html = markdown.markdown(f.read())
     write_file(output_file, html)
+    return f"Markdown converted to HTML written to {output_file}"
 
 def find_similar_comments(file, output_file):
     logger.info(f"Finding similar comments in {file} and writing to {output_file}")
@@ -805,7 +827,8 @@ function_map = {
     "execute_linux_command": execute_linux_command,
     "install_uv_and_run_script": install_uv_and_run_script,
     "compress_or_resize_image": compress_or_resize_image,
-    "filter_csv": filter_csv
+    "filter_csv": filter_csv,
+    "file_folder_deletion": file_folder_deletion
 }
 
 # Task Runner
