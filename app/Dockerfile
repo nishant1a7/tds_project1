@@ -1,4 +1,4 @@
-# Use official Python image
+# Stage 1: Python stage - Use official Python image
 FROM python:3.12-slim
 
 # Set the working directory
@@ -7,6 +7,8 @@ WORKDIR /app
 # Install system dependencies for required packages
 RUN apt-get update && apt-get install -y \
     git \
+    vim \
+    npm \
     tesseract-ocr \
     libsqlite3-dev \
     libglib2.0-0 \
@@ -16,8 +18,12 @@ RUN apt-get update && apt-get install -y \
 # Copy project files
 COPY . /app
 
+COPY requirements.txt .
+
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
+RUN npm install --no-cache-dir prettier@3.4.2
 
 # Expose FastAPI port
 EXPOSE 8000

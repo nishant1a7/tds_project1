@@ -18,6 +18,11 @@ import numpy as np
 import datetime
 import re
 from dateutil import parser
+import shutil
+
+# To Do
+# Vectorize functions to reduce LLM usage
+# Put all the functions in a separate file
 
 # Common date formats
 # Expanded list of common date formats (with and without time)
@@ -62,10 +67,12 @@ app.add_middleware(
 
 # Security functions
 def enforce_data_security(file_path):
+    logger.info(f"Checking file path: {file_path}")
     if not file_path.startswith(SECURE_DATA_PATH):
         raise PermissionError(f"Access denied: {file_path}")
 
 def prevent_deletion(file_path):
+    logger.info(f"Checking file path: {file_path}")
     raise PermissionError(f"Deletion not allowed: {file_path}")
 
 # AI Proxy LLM Call with Function Calling
@@ -315,8 +322,9 @@ def ask_llm(task_description):
         "functions": function_definitions,
         "temperature": 0
     }
-
+    logger.info(f"Before LLM API Call:")
     response = requests.post(AI_PROXY_CHAT_URL, json=payload, headers=headers)
+    logger.info(f"After LLM API Call:")
 
     if response.status_code == 200:
         try:
@@ -369,20 +377,27 @@ def install_uv_and_run_script(script_url, user_email):
     """Installs `uv` (if required), downloads `datagen.py`, and runs it with `user.email`."""
     logger.info(f"Installing uv and running script {script_url} with email {user_email}")
 
-    uv_installed = False
+    uv_check = shutil.which("uv")
 
-    # Step 1: Check if `uv` is installed
-    try:
-        subprocess.run(["uv", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        uv_installed = True
-    except subprocess.CalledProcessError as e:
-        logger.info(f"uv is not installed {str(e)}")
-        pass
-    #    uv_installed = False
+    if uv_check:
+        logger.info(f"uv is already installed")
+        # uv_check = subprocess.run(["uv", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    logger.info(f"uv_installed {uv_installed}")
+    # logger.info(f"uv_check {uv_check}")
+    # # Step 1: Check if `uv` is installed
+    # try:
+    #     logger.info(f"Before subprocess.run uv --version")
+    #     subprocess.run(["uv", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    #     logger.info(f"After subprocess.run uv --version")
+    #     uv_installed = True
+    # except subprocess.CalledProcessError as e:
+    #     logger.info(f"uv is not installed {str(e)}")
+    #     pass
+    # #    uv_installed = False
+
+    
     # Step 2: Install `uv` if not installed
-    if not uv_installed:
+    if not uv_check:
         try:
             logger.info("Installing uv...")
             subprocess.run(["pip", "install", "uv"], check=True)
@@ -390,12 +405,12 @@ def install_uv_and_run_script(script_url, user_email):
             return f"Error installing uv: {str(e)}"
 
     # Step 3: Download `datagen.py` if not already present
-    script_path = "/data/datagen.py"
+    script_path = "datagen.py"
      
     if not os.path.exists(script_path):
         logger.info("Downloading script...")
         try:
-            response = requests.get(script_url, timeout=10)
+            response = requests.get(script_url, timeout=15)
             if response.status_code == 200:
                 with open(script_path, "wb") as f:
                     f.write(response.content)
@@ -408,10 +423,11 @@ def install_uv_and_run_script(script_url, user_email):
     try:
         logger.info(f"Running script... {script_path} with email {user_email}")
         subprocess.run(["uv", "run", script_path, user_email], check=True)
-        return f"Script {script_path} executed successfully with email {user_email}."
+        os.remove(script_path)
+        return f"Script {script_path} executed successfully with email {user_email} and removed the script."
     except subprocess.CalledProcessError as e:
-        return f"Error executing script: {str(e)}"
-    
+        return f"Error executing script: {str(e)}"    
+
 def install_package(package):
     logger.info(f"Installing package {package}")
     subprocess.run(["pip", "install", package], check=True)
@@ -427,6 +443,7 @@ def execute_script(script, args=[]):
 
 def clean_date_string(date_str):
     """Cleans the date string by removing extra spaces, special characters, and time if present."""
+    logger.info(f"Cleaning date string: {date_str}")
     date_str = date_str.strip()  # Remove leading/trailing spaces
     date_str = re.sub(r"[^\w\s/-]", "", date_str)  # Remove special characters except / and -
     date_str = re.split(r"\s+", date_str)[0]  # Remove time component if present
@@ -435,6 +452,7 @@ def clean_date_string(date_str):
 def parse_date(date_str):
     """Tries multiple formats to parse a date string after cleaning, with a fallback to dateutil.parser."""
     cleaned_date = clean_date_string(date_str)
+    logger.info(f"Cleaned date string: {cleaned_date}")
 
     for fmt in DATE_FORMATS:
         try:
@@ -499,8 +517,10 @@ def extract_email(file, output_file):
 
 def preprocess_image(file):
     """Preprocess the image to improve OCR accuracy."""
+    logger.info(f"Preprocessing image {file}")
     image = Image.open(file).convert("L")  # Convert to grayscale
     image = image.filter(ImageFilter.SHARPEN)  # Sharpen the image
+    logger.info(f"Enhancing Image")
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(5)  # Increase contrast
     # image = image.point(lambda p: 0 if p < 100 else 255)  # Apply thresholding
@@ -518,6 +538,7 @@ def extract_credit_card(file, output_file):
         # OCR Configuration: Only allow digits, better segmentation
         config = "--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789"
 
+        logger.info(f"Before OCR image_to_string")
         text = pytesseract.image_to_string(image, config=config)
 
         # Extract credit card number using regex
@@ -547,6 +568,7 @@ def sort_json(file, output_file=None, keys=None):
     """Sorts contacts from a JSON file in ascending order by last_name, then first_name, and writes only JSON output."""
     enforce_data_security(file)
     enforce_data_security(output_file)
+    logger.info(f"Sorting JSON file {file} and writing to {output_file}")
 
     try:
         with open(file, "r", encoding="utf-8") as f:
@@ -584,6 +606,7 @@ def extract_markdown_headers(directory, output_file="/data/docs/index.json"):
     """Finds all Markdown (.md) files in a directory, extracts the first H1 header, and writes a single-line JSON list to a file."""
     enforce_data_security(directory)
     enforce_data_security(output_file)
+    logger.info(f"Extracting Markdown headers from {directory} and writing to {output_file}")
 
     index = {}
 
@@ -717,7 +740,7 @@ def format_markdown(file):
     enforce_data_security(file)
 
     try:
-        subprocess.run(["npx", "prettier@3.4.2", "--write", file], check=True)
+        subprocess.run(["npx", "prettier@3.4.2", "--write", file])
         return f"Formatted {file} successfully with Prettier@3.4.2."
     except subprocess.CalledProcessError as e:
         return f"Error formatting {file}: {str(e)}"
@@ -790,6 +813,9 @@ def task_runner(task_description):
     structured_steps = ask_llm(task_description)
     output = []
     logger.info(f"structured_steps {structured_steps}")
+    if not isinstance(structured_steps, list):
+        structured_steps = [structured_steps]
+
     for step in structured_steps:
         action = step.get("name")
         params = step.get("arguments", {})
