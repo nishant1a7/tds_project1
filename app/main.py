@@ -20,6 +20,7 @@ import re
 from dateutil import parser
 import shutil
 
+
 # To Do
 # Vectorize functions to reduce LLM usage
 # Put all the functions in a separate file
@@ -881,7 +882,7 @@ def read_file(path: str):
 
         # Return plain text for other file types
         with open(path, "r", encoding="utf-8") as f:
-            content = f.read().strip()
+            content = f.read()
         return Response(content, media_type="text/plain")   # ✅ Returns raw text (not double-quoted JSON string)
 
     except json.JSONDecodeError:
